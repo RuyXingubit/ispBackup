@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlanType {
+  CLOUD_MANAGED
+  ZERO_TRUST
+}
+
+enum VendorType {
+  MIKROTIK
+  HUAWEI
+  CISCO
+  DATACOM
+}
+
+enum BackupStatus {
+  SUCCESS
+  FAILED
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  plan      PlanType @default(CLOUD_MANAGED)
+  agentToken String  @unique
+  createdAt DateTime @default(now())
+  devices   Device[]
+}
+
+model Device {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  ipAddress   String
+  vendor      VendorType
+  sshUser     String?
+  sshPassword String?
+  backups     BackupLog[]
+}
+
+model BackupLog {
+  id          String   @id @default(cuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id])
+  status      BackupStatus
+  fileSizeMb  Float
+  s3Url       String?
+  localPath   String?
+  createdAt   DateTime @default(now())
+}

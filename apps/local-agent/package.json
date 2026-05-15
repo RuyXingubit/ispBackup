@@ -1,0 +1,18 @@
+{
+  "name": "@ispbackup/local-agent",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.500.0",
+    "axios": "^1.6.7",
+    "basic-ftp": "^6.0.1",
+    "better-sqlite3": "^12.10.0",
+    "chokidar": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "ftp-srv": "^4.6.2"
+  }
+}
