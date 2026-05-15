@@ -26,6 +26,15 @@ db.exec(`
     file_path TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS local_backup_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT,
+    status TEXT,
+    message TEXT,
+    file_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 function authenticateFtpUser(username, password) {

@@ -2,6 +2,7 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { db } = require('./db');
 require('dotenv').config();
 
 const s3Client = new S3Client({
@@ -15,8 +16,8 @@ const s3Client = new S3Client({
 });
 
 async function uploadFileAndNotify(filePath, deviceId) {
+  const fileName = path.basename(filePath);
   try {
-    const fileName = path.basename(filePath);
     const tenantId = process.env.TENANT_ID || 'demo_tenant';
     
     // Agora organizamos no S3 também pelo Device ID
@@ -54,8 +55,24 @@ async function uploadFileAndNotify(filePath, deviceId) {
     });
 
     console.log(`[Uploader] Sincronização e Metadados finalizados para ${deviceId}!`);
+    
+    // Log Local Success
+    try {
+      const stmt = db.prepare('INSERT INTO local_backup_logs (device_id, status, message, file_name) VALUES (?, ?, ?, ?)');
+      stmt.run(deviceId, 'SUCCESS', 'Backup enviado para S3 e notificado.', fileName);
+    } catch (dbErr) {
+      console.error('[Uploader] Erro ao gravar log local:', dbErr);
+    }
   } catch (error) {
     console.error(`[Uploader] Erro crítico no fluxo de envio Cloud:`, error.message);
+    
+    // Log Local Error
+    try {
+      const stmt = db.prepare('INSERT INTO local_backup_logs (device_id, status, message, file_name) VALUES (?, ?, ?, ?)');
+      stmt.run(deviceId, 'FAILED', error.message, fileName);
+    } catch (dbErr) {
+      console.error('[Uploader] Erro ao gravar log local:', dbErr);
+    }
     // TODO: Jogar o arquivo retido para a fila (offline_queue) no SQLite
   }
 }
