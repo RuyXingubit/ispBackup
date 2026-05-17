@@ -7,6 +7,8 @@ interface Device {
   ip: string;
   vendor: string;
   sshUser: string;
+  backupMethod?: string;
+  backupSchedule?: string;
 }
 
 interface Log {
@@ -39,6 +41,8 @@ function App() {
   const [editVendor, setEditVendor] = useState('MIKROTIK');
   const [editSshUser, setEditSshUser] = useState('');
   const [editSshPassword, setEditSshPassword] = useState('');
+  const [editBackupMethod, setEditBackupMethod] = useState('FTP_PASSIVE');
+  const [editBackupSchedule, setEditBackupSchedule] = useState('0 2 * * *');
 
   // Add Form State
   const [name, setName] = useState('');
@@ -46,6 +50,8 @@ function App() {
   const [vendor, setVendor] = useState('MIKROTIK');
   const [sshUser, setSshUser] = useState('');
   const [sshPassword, setSshPassword] = useState('');
+  const [backupMethod, setBackupMethod] = useState('FTP_PASSIVE');
+  const [backupSchedule, setBackupSchedule] = useState('0 2 * * *');
 
   const fetchDevices = async () => {
     try {
@@ -69,12 +75,14 @@ function App() {
       await fetch('/api/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, ip, vendor, sshUser, sshPassword })
+        body: JSON.stringify({ name, ip, vendor, sshUser, sshPassword, backupMethod, backupSchedule })
       });
       setName('');
       setIp('');
       setSshUser('');
       setSshPassword('');
+      setBackupMethod('FTP_PASSIVE');
+      setBackupSchedule('0 2 * * *');
       fetchDevices();
     } catch (error) {
       console.error('Failed to add device', error);
@@ -99,6 +107,8 @@ function App() {
     setEditVendor(device.vendor);
     setEditSshUser(device.sshUser || '');
     setEditSshPassword('');
+    setEditBackupMethod(device.backupMethod || 'FTP_PASSIVE');
+    setEditBackupSchedule(device.backupSchedule || '0 2 * * *');
 
     // Fetch Logs
     try {
@@ -122,7 +132,11 @@ function App() {
       await fetch(`/api/devices/${selectedDevice.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editName, ip: editIp, vendor: editVendor, sshUser: editSshUser, sshPassword: editSshPassword })
+        body: JSON.stringify({ 
+          name: editName, ip: editIp, vendor: editVendor, 
+          sshUser: editSshUser, sshPassword: editSshPassword,
+          backupMethod: editBackupMethod, backupSchedule: editBackupSchedule
+        })
       });
       fetchDevices();
       alert('Equipamento atualizado com sucesso!');
@@ -192,8 +206,37 @@ function App() {
                 >
                   <option value="MIKROTIK">MikroTik</option>
                   <option value="HUAWEI">Huawei</option>
+                  <option value="DATACOM">Datacom</option>
                 </select>
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground/80 mb-1">Método de Backup</label>
+                <select
+                  value={backupMethod}
+                  onChange={(e) => setBackupMethod(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-4 py-2 focus:outline-none focus:border-primary transition-colors"
+                >
+                  <option value="FTP_PASSIVE">Passivo (MikroTik/Huawei via FTP)</option>
+                  <option value="TFTP_TELNET">Ativo (Telnet + TFTP)</option>
+                  <option value="TFTP_SSH">Ativo (SSH + TFTP)</option>
+                </select>
+              </div>
+              {backupMethod !== 'FTP_PASSIVE' && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground/80 mb-1">Horário (Cron)</label>
+                  <input
+                    type="text"
+                    value={backupSchedule}
+                    onChange={(e) => setBackupSchedule(e.target.value)}
+                    required
+                    className="w-full bg-background border border-border rounded-xl px-4 py-2 focus:outline-none focus:border-primary transition-colors"
+                    placeholder="0 2 * * *"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="pt-4 border-t border-border">
@@ -265,6 +308,9 @@ function App() {
                       <p className="text-sm text-foreground/60 flex items-center gap-2">
                         <span className="font-mono bg-card px-1.5 py-0.5 rounded text-xs">{device.ip}</span>
                         • {device.vendor}
+                        {device.backupMethod !== 'FTP_PASSIVE' && (
+                          <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded text-xs ml-2">Ativo (Cron)</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -336,10 +382,28 @@ function App() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground/80 mb-1">Fabricante</label>
-                      <select disabled value={editVendor} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 opacity-70">
+                      <select value={editVendor} onChange={e => setEditVendor(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-2 focus:outline-none focus:border-primary">
                         <option value="MIKROTIK">MikroTik</option>
+                        <option value="HUAWEI">Huawei</option>
+                        <option value="DATACOM">Datacom</option>
                       </select>
                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground/80 mb-1">Método de Backup</label>
+                      <select value={editBackupMethod} onChange={e => setEditBackupMethod(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-2 focus:outline-none focus:border-primary">
+                        <option value="FTP_PASSIVE">Passivo (MikroTik/Huawei via FTP)</option>
+                        <option value="TFTP_TELNET">Ativo (Telnet + TFTP)</option>
+                        <option value="TFTP_SSH">Ativo (SSH + TFTP)</option>
+                      </select>
+                    </div>
+                    {editBackupMethod !== 'FTP_PASSIVE' && (
+                      <div>
+                        <label className="block text-sm font-medium text-foreground/80 mb-1">Horário (Cron)</label>
+                        <input type="text" value={editBackupSchedule} onChange={e => setEditBackupSchedule(e.target.value)} required className="w-full bg-background border border-border rounded-xl px-4 py-2 focus:outline-none focus:border-primary" />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground/80 mb-1">Usuário FTP</label>

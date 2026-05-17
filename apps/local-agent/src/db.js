@@ -17,7 +17,9 @@ db.exec(`
     name TEXT,
     ip_address TEXT,
     ftp_user TEXT UNIQUE,
-    ftp_password TEXT
+    ftp_password TEXT,
+    backup_method TEXT DEFAULT 'FTP_PASSIVE',
+    backup_schedule TEXT DEFAULT '0 2 * * *'
   );
 
   CREATE TABLE IF NOT EXISTS offline_queue (
@@ -41,6 +43,14 @@ function authenticateFtpUser(username, password) {
   const stmt = db.prepare('SELECT id FROM devices WHERE ftp_user = ? AND ftp_password = ?');
   const device = stmt.get(username, password);
   return device ? device.id : null;
+}
+
+// Migration: Adiciona colunas para coleta ativa caso a tabela já exista
+try {
+  db.exec("ALTER TABLE devices ADD COLUMN backup_method TEXT DEFAULT 'FTP_PASSIVE'");
+  db.exec("ALTER TABLE devices ADD COLUMN backup_schedule TEXT DEFAULT '0 2 * * *'");
+} catch (e) {
+  // Ignora se as colunas já existirem
 }
 
 // Inserindo um dispositivo de teste para podermos testar o fluxo seguro

@@ -4,6 +4,8 @@ const cors = require('cors');
 const path = require('path');
 const { startFtpServer } = require('./ftp-server');
 const { startWatcher } = require('./watcher');
+const { startTftpServer } = require('./tftp-server');
+const { startScheduler, reloadSchedule } = require('./scheduler');
 const { db } = require('./db');
 
 console.log("=========================================");
@@ -14,9 +16,11 @@ if (!process.env.TENANT_ID || !process.env.AGENT_TOKEN) {
   console.warn("[Sistema] Operando em modo de falha sem variáveis de conexão Nuvem.");
 }
 
-// Inicialização Assíncrona dos Módulos Core (FTP e Watcher)
+// Inicialização Assíncrona dos Módulos Core (FTP, Watcher, TFTP, Scheduler)
 const diretorioDeDados = startFtpServer();
 startWatcher(diretorioDeDados);
+startTftpServer(diretorioDeDados);
+startScheduler();
 
 // Inicialização do Servidor Web (Painel Local Zero Trust)
 const app = express();
@@ -26,7 +30,7 @@ app.use(express.json());
 // API Routes for Local SQLite
 app.get('/api/devices', (req, res) => {
   try {
-    const devices = db.prepare('SELECT id, name, ip_address as ip, ftp_user as sshUser FROM devices').all();
+    const devices = db.prepare('SELECT id, name, ip_address as ip, ftp_user as sshUser, backup_method as backupMethod, backup_schedule as backupSchedule FROM devices').all();
     res.json(devices);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -34,11 +38,12 @@ app.get('/api/devices', (req, res) => {
 });
 
 app.post('/api/devices', (req, res) => {
-  const { name, ip, vendor, sshUser, sshPassword } = req.body;
+  const { name, ip, vendor, sshUser, sshPassword, backupMethod, backupSchedule } = req.body;
   const id = `dev_${Date.now()}`;
   try {
-    const stmt = db.prepare('INSERT INTO devices (id, name, ip_address, ftp_user, ftp_password) VALUES (?, ?, ?, ?, ?)');
-    stmt.run(id, name, ip, sshUser, sshPassword);
+    const stmt = db.prepare('INSERT INTO devices (id, name, ip_address, ftp_user, ftp_password, backup_method, backup_schedule) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    stmt.run(id, name, ip, sshUser, sshPassword, backupMethod || 'FTP_PASSIVE', backupSchedule || '0 2 * * *');
+    reloadSchedule(id);
     res.json({ success: true, id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -56,15 +61,16 @@ app.delete('/api/devices/:id', (req, res) => {
 });
 
 app.put('/api/devices/:id', (req, res) => {
-  const { name, ip, vendor, sshUser, sshPassword } = req.body;
+  const { name, ip, vendor, sshUser, sshPassword, backupMethod, backupSchedule } = req.body;
   try {
     if (sshPassword) {
-      const stmt = db.prepare('UPDATE devices SET name = ?, ip_address = ?, ftp_user = ?, ftp_password = ? WHERE id = ?');
-      stmt.run(name, ip, sshUser, sshPassword, req.params.id);
+      const stmt = db.prepare('UPDATE devices SET name = ?, ip_address = ?, ftp_user = ?, ftp_password = ?, backup_method = ?, backup_schedule = ? WHERE id = ?');
+      stmt.run(name, ip, sshUser, sshPassword, backupMethod || 'FTP_PASSIVE', backupSchedule || '0 2 * * *', req.params.id);
     } else {
-      const stmt = db.prepare('UPDATE devices SET name = ?, ip_address = ?, ftp_user = ? WHERE id = ?');
-      stmt.run(name, ip, sshUser, req.params.id);
+      const stmt = db.prepare('UPDATE devices SET name = ?, ip_address = ?, ftp_user = ?, backup_method = ?, backup_schedule = ? WHERE id = ?');
+      stmt.run(name, ip, sshUser, backupMethod || 'FTP_PASSIVE', backupSchedule || '0 2 * * *', req.params.id);
     }
+    reloadSchedule(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
