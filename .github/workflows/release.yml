@@ -1,8 +1,5 @@
 name: Release
 
-env:
-  # Removing FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 as v6 actions natively support Node 24
-
 on:
   push:
     branches:
